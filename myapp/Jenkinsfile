@@ -16,20 +16,24 @@ pipeline {
         }
 
         stage('Build with Maven') {
-    steps {
-        sh 'mvn clean package -DskipTests'
+            steps {
+                dir('javaapp/myapp') {
+                    sh 'mvn clean package -DskipTests'
                 }
             }
+        }
 
         stage('Docker Build & Push') {
             steps {
                 script {
-                    sh """
-                    docker build -t myapp:${IMAGE_TAG} .
-                    docker tag myapp:${IMAGE_TAG} $ECR_REPO:${IMAGE_TAG}
-                    aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO
-                    docker push $ECR_REPO:${IMAGE_TAG}
-                    """
+                    dir('javaapp/myapp') {
+                        sh """
+                        docker build -t myapp:${IMAGE_TAG} .
+                        docker tag myapp:${IMAGE_TAG} $ECR_REPO:${IMAGE_TAG}
+                        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO
+                        docker push $ECR_REPO:${IMAGE_TAG}
+                        """
+                    }
                 }
             }
         }
@@ -37,11 +41,13 @@ pipeline {
         stage('Deploy to EKS') {
             steps {
                 script {
-                    sh """
-                    kubectl apply -f deployment.yaml
-                    kubectl apply -f service.yaml
-                    kubectl apply -f hpa.yaml
-                    """
+                    dir('javaapp/myapp') {
+                        sh """
+                        kubectl apply -f deployment.yaml
+                        kubectl apply -f service.yaml
+                        kubectl apply -f hpa.yaml
+                        """
+                    }
                 }
             }
         }
