@@ -8,6 +8,6 @@ RUN mvn -B -DskipTests clean package
 FROM eclipse-temurin:17-jre-jammy
 WORKDIR /myapp
 # copy jar produced by build stage (adjust name if different)
-COPY --from=build /app/target/*.jar myapp-0.0.1-SNAPSHOT.jar
+COPY --from=build /myapp/target/*.jar myapp-0.0.1-SNAPSHOT.jar
 EXPOSE 8080
 ENTRYPOINT ["java","-jar","/myapp/myapp-0.0.1-SNAPSHOT.jar"]
