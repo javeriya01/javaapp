@@ -18,10 +18,11 @@ pipeline {
         stage('Build with Maven') {
             steps {
                 dir('javaapp/myapp') {
-                    sh './mvnw clean package -DskipTests'
+                    sh 'mvn clean package -DskipTests'
                 }
             }
         }
+
 
         stage('Docker Build & Push') {
             steps {
