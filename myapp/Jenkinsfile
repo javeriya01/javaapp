@@ -18,32 +18,36 @@ pipeline {
         stage('Build with Maven') {
             steps {
                 dir('myapp') {
-                    sh './mvnw clean package -DskipTests'
+                    sh 'mvn clean package -DskipTests'
                 }
             }
         }
 
         stage('Docker Build & Push') {
             steps {
-                dir('myapp') {
-                    sh """
-                    docker build -t myapp:${IMAGE_TAG} .
-                    docker tag myapp:${IMAGE_TAG} $ECR_REPO:${IMAGE_TAG}
-                    aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO
-                    docker push $ECR_REPO:${IMAGE_TAG}
-                    """
+                withAWS(credentials: 'aws-creds', region: "${AWS_REGION}") {
+                    dir('myapp') {
+                        sh """
+                        docker build -t myapp:${IMAGE_TAG} .
+                        docker tag myapp:${IMAGE_TAG} $ECR_REPO:${IMAGE_TAG}
+                        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO
+                        docker push $ECR_REPO:${IMAGE_TAG}
+                        """
+                    }
                 }
             }
         }
 
         stage('Deploy to EKS') {
             steps {
-                dir('myapp') {
-                    sh """
-                    kubectl apply -f deployment.yaml
-                    kubectl apply -f service.yaml
-                    kubectl apply -f hpa.yaml
-                    """
+                withAWS(credentials: 'aws-creds', region: "${AWS_REGION}") {
+                    dir('myapp') {
+                        sh """
+                        kubectl apply -f deployment.yaml
+                        kubectl apply -f service.yaml
+                        kubectl apply -f hpa.yaml
+                        """
+                    }
                 }
             }
         }
