@@ -4,7 +4,7 @@ pipeline {
     environment {
         AWS_REGION = "ap-south-1"
         ECR_REPO   = "484907483770.dkr.ecr.ap-south-1.amazonaws.com/myapp"
-        IMAGE_TAG  = "build-${BUILD_NUMBER}"
+        IMAGE_TAG  = "latest"
     }
 
     stages {
@@ -17,24 +17,19 @@ pipeline {
 
         stage('Build with Maven') {
             steps {
-                dir('javaapp/myapp') {
-                    sh 'mvn clean package -DskipTests'
-                }
+                sh 'mvn clean package -DskipTests'
             }
         }
-
 
         stage('Docker Build & Push') {
             steps {
                 script {
-                    dir('javaapp/myapp') {
-                        sh """
-                        docker build -t myapp:${IMAGE_TAG} .
-                        docker tag myapp:${IMAGE_TAG} $ECR_REPO:${IMAGE_TAG}
-                        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO
-                        docker push $ECR_REPO:${IMAGE_TAG}
-                        """
-                    }
+                    sh """
+                    docker build -t myapp:${IMAGE_TAG} .
+                    docker tag myapp:${IMAGE_TAG} $ECR_REPO:${IMAGE_TAG}
+                    aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO
+                    docker push $ECR_REPO:${IMAGE_TAG}
+                    """
                 }
             }
         }
@@ -42,15 +37,11 @@ pipeline {
         stage('Deploy to EKS') {
             steps {
                 script {
-                    dir('javaapp/myapp') {
-                        sh """
-                        # Update deployment image before applying
-                        kubectl set image deployment/myapp-deployment myapp=$ECR_REPO:${IMAGE_TAG} --record || true
-                        kubectl apply -f deployment.yaml
-                        kubectl apply -f service.yaml
-                        kubectl apply -f hpa.yaml
-                        """
-                    }
+                    sh """
+                    kubectl apply -f deployment.yaml
+                    kubectl apply -f service.yaml
+                    kubectl apply -f hpa.yaml
+                    """
                 }
             }
         }
