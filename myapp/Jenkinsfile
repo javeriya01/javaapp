@@ -17,13 +17,15 @@ pipeline {
 
         stage('Build with Maven') {
             steps {
-                sh 'mvn clean package -DskipTests'
+                dir('myapp') {
+                    sh './mvnw clean package -DskipTests'
+                }
             }
         }
 
         stage('Docker Build & Push') {
             steps {
-                script {
+                dir('myapp') {
                     sh """
                     docker build -t myapp:${IMAGE_TAG} .
                     docker tag myapp:${IMAGE_TAG} $ECR_REPO:${IMAGE_TAG}
@@ -36,7 +38,7 @@ pipeline {
 
         stage('Deploy to EKS') {
             steps {
-                script {
+                dir('myapp') {
                     sh """
                     kubectl apply -f deployment.yaml
                     kubectl apply -f service.yaml
