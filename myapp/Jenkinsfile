@@ -16,20 +16,19 @@ pipeline {
             }
         }
 
-        stage('Docker Build') {
-            steps {
-                dir('myapp') {
-                    sh """
-                        # Enable minikube docker daemon inside Jenkins
-                        eval \$(minikube docker-env)
+       stage('Docker Build') {
+    steps {
+        dir('myapp') {
+            sh '''
+                # Get Minikube Docker environment variables and export them
+                eval $(minikube docker-env)
 
-                        # Build Docker image inside Minikube's Docker
-                        docker build -t myapp:latest .
-                    """
-                }
-            }
+                # Now build the Docker image inside Minikube's Docker daemon
+                docker build -t myapp:latest .
+            '''
         }
-
+    }
+}
         stage('Deploy to Minikube') {
             steps {
                 dir('myapp') {
