@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: myapp
-        image: 484907483770.dkr.ecr.ap-south-1.amazonaws.com/myapp:latest
+        image: myapp:1.0
         ports:
         - containerPort: 8080
         livenessProbe:
