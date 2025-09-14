@@ -1,12 +1,6 @@
 pipeline {
     agent any
 
-    environment {
-        AWS_REGION = "ap-south-1"
-        ECR_REPO   = "484907483770.dkr.ecr.ap-south-1.amazonaws.com/myapp"
-        IMAGE_TAG  = "latest"
-    }
-
     stages {
         stage('Checkout') {
             steps {
@@ -23,31 +17,23 @@ pipeline {
             }
         }
 
-        stage('Docker Build & Push') {
+        stage('Docker Build') {
             steps {
-                withAWS(credentials: 'aws-creds', region: "${AWS_REGION}") {
-                    dir('myapp') {
-                        sh """
-                        docker build -t myapp:${IMAGE_TAG} .
-                        docker tag myapp:${IMAGE_TAG} $ECR_REPO:${IMAGE_TAG}
-                        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO
-                        docker push $ECR_REPO:${IMAGE_TAG}
-                        """
-                    }
+                dir('myapp') {
+                    // Build using Minikube’s Docker daemon
+                    sh 'eval $(minikube docker-env) && docker build -t myapp:1.0 .'
                 }
             }
         }
 
-        stage('Deploy to EKS') {
+        stage('Deploy to Minikube') {
             steps {
-                withAWS(credentials: 'aws-creds', region: "${AWS_REGION}") {
-                    dir('myapp') {
-                        sh """
+                dir('myapp') {
+                    sh '''
                         kubectl apply -f deployment.yaml
                         kubectl apply -f service.yaml
                         kubectl apply -f hpa.yaml
-                        """
-                    }
+                    '''
                 }
             }
         }
