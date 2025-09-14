@@ -15,6 +15,7 @@ spec:
       containers:
       - name: myapp
         image: myapp:latest
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
         livenessProbe:
