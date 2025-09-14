@@ -8,6 +8,13 @@ pipeline {
             }
         }
 
+     stage('Check Minikube') {
+           steps {
+             sh 'minikube status'
+             sh 'docker ps'
+           }
+         }
+
         stage('Build with Maven') {
             steps {
                 dir('myapp') {
