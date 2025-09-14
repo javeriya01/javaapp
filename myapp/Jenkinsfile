@@ -4,8 +4,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main',
-                    url: 'https://github.com/javeriya01/javaapp.git'
+                git branch: 'main', url: 'https://github.com/javeriya01/javaapp.git'
             }
         }
 
@@ -20,8 +19,13 @@ pipeline {
         stage('Docker Build') {
             steps {
                 dir('myapp') {
-                    // Build using Minikube’s Docker daemon
-                    sh 'eval $(minikube docker-env) && docker build -t myapp:1.0 .'
+                    sh """
+                        # Enable minikube docker daemon inside Jenkins
+                        eval \$(minikube docker-env)
+
+                        # Build Docker image inside Minikube's Docker
+                        docker build -t myapp:latest .
+                    """
                 }
             }
         }
@@ -29,11 +33,11 @@ pipeline {
         stage('Deploy to Minikube') {
             steps {
                 dir('myapp') {
-                    sh '''
+                    sh """
                         kubectl apply -f deployment.yaml
                         kubectl apply -f service.yaml
                         kubectl apply -f hpa.yaml
-                    '''
+                    """
                 }
             }
         }
