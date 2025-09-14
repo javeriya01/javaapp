@@ -1,134 +1,58 @@
 pipeline {
-  agent any
+    agent any
 
-  environment {
-    # IMPORTANT: set these to the real locations where minikube and kubeconfig live on the EC2 host
-    MINIKUBE_HOME = "/home/ec2-user/.minikube"
-    KUBECONFIG    = "/home/ec2-user/.kube/config"
-    IMAGE         = "myapp:latest"
-    WORKDIR       = "myapp"            // directory inside the repo that contains pom, Dockerfile, deployment.yaml
-  }
-
-  options { timestamps() }
-
-  stages {
-    stage('Checkout') {
-      steps {
-        echo "Checking out repository..."
-        // Use checkout or git step. This job should be configured as "Pipeline script from SCM" with Script Path = "myapp/Jenkinsfile"
-        checkout([$class: 'GitSCM',
-                  branches: [[name: '*/main']],
-                  userRemoteConfigs: [[url: 'https://github.com/javeriya01/javaapp.git']]])
-        sh 'echo "Repository files:" && ls -la'
-      }
-    }
-
-    stage('Debug - Host & Minikube') {
-      steps {
-        echo "Debugging environment (helpful for diagnosing failures)..."
-        sh '''
-          echo "=== whoami && id ==="; whoami; id || true
-          echo "=== PATH ==="; echo $PATH
-          echo "=== ENV (selected) ==="
-          echo "MINIKUBE_HOME=${MINIKUBE_HOME}"
-          echo "KUBECONFIG=${KUBECONFIG}"
-          env | sort | egrep 'MINIKUBE|KUBECONFIG|DOCKER' || true
-          echo "=== MINIKUBE_HOME listing ==="
-          ls -la "${MINIKUBE_HOME}" || true
-          echo "=== KUBECONFIG file ==="
-          ls -la "${KUBECONFIG}" || true
-          echo "=== minikube version/status ==="
-          minikube version || true
-          minikube status -p minikube || true
-        '''
-      }
-    }
-
-    stage('Build with Maven') {
-      steps {
-        dir("${WORKDIR}") {
-          echo "Building with Maven (skipping tests)..."
-          // try mvnw first, fallback to mvn
-          sh '''
-            if [ -x ./mvnw ]; then
-              ./mvnw -B -DskipTests clean package
-            else
-              mvn -B -DskipTests clean package
-            fi
-            ls -la target || true
-          '''
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/javeriya01/javaapp.git'
+            }
         }
-      }
-    }
 
-    stage('Docker Build (use Minikube docker daemon)') {
-      steps {
-        dir("${WORKDIR}") {
-          echo "Building Docker image inside Minikube docker daemon..."
-          sh '''
-            # Ensure Jenkins uses the same minikube home/kubeconfig that you set on EC2
-            export MINIKUBE_HOME="${MINIKUBE_HOME}"
-            export KUBECONFIG="${KUBECONFIG}"
-            echo "MINIKUBE_HOME=${MINIKUBE_HOME}"
-            echo "KUBECONFIG=${KUBECONFIG}"
-
-            # Check minikube profile exists
-            minikube status -p minikube || true
-
-            # If profile missing, we intentionally fail with code 85 (same code you saw) and print diagnostics
-            if minikube status -p minikube 2>&1 | grep -qi 'Profile .* not found'; then
-              echo "ERROR: minikube profile not found for user $(whoami)."
-              echo "Run: sudo -u jenkins -i minikube start --driver=docker (or create symlink to /home/ec2-user/.minikube)."
-              minikube profile list || true
-              exit 85
-            fi
-
-            # Activate minikube docker environment for the current shell (this sets DOCKER_HOST/DOCKER_CERT_PATH/DOCKER_TLS_VERIFY)
-            eval "$(minikube -p minikube docker-env)" || { echo "minikube docker-env failed"; exit 1; }
-
-            echo "docker client info (using minikube daemon):"
-            docker info || true
-
-            echo "Building docker image ${IMAGE}..."
-            docker build -t ${IMAGE} .
-            docker images | grep ${IMAGE} || true
-          '''
+        stage('Check Minikube') {
+            steps {
+                sh '''
+                    // Check if minikube is running, otherwise start it
+                    if ! minikube status >/dev/null 2>&1; then
+                        echo "Starting Minikube..."
+                        minikube start --driver=docker
+                    else
+                        echo "Minikube is already running."
+                    fi
+                    kubectl get nodes
+                '''
+            }
         }
-      }
-    }
 
-    stage('Deploy to Minikube (kubectl)') {
-      steps {
-        dir("${WORKDIR}") {
-          echo "Applying Kubernetes manifests to minikube..."
-          sh '''
-            export KUBECONFIG="${KUBECONFIG}"
-            echo "kubectl version (client/server):"
-            kubectl version --client --short || true
-            kubectl config current-context || true
-            kubectl apply -f deployment.yaml
-            kubectl apply -f service.yaml
-            kubectl apply -f hpa.yaml || true
-            echo "Waiting 5s then listing pods:"
-            sleep 5
-            kubectl get pods -o wide || true
-            kubectl get svc || true
-          '''
+        stage('Build with Maven') {
+            steps {
+                dir('myapp') {
+                    sh 'mvn clean package -DskipTests'
+                }
+            }
         }
-      }
-    }
-  } // stages
 
-  post {
-    always {
-      echo "Pipeline finished - collecting debug info..."
-      sh '''
-        echo "=== Final pods ==="
-        kubectl get pods -o wide || true
-        echo "=== Last 200 lines of pod logs (label app=myapp) ==="
-        kubectl logs -l app=myapp --tail=200 || true
-      '''
-      archiveArtifacts artifacts: "${WORKDIR}/target/*.jar", allowEmptyArchive: true
+        stage('Docker Build') {
+            steps {
+                dir('myapp') {
+                    sh '''
+                        eval $(minikube -p minikube docker-env)
+                        docker build -t myapp:latest .
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy to Minikube') {
+            steps {
+                dir('myapp') {
+                    sh '''
+                        kubectl apply -f deployment.yaml
+                        kubectl apply -f service.yaml
+                        kubectl apply -f hpa.yaml
+                        kubectl get all
+                    '''
+                }
+            }
+        }
     }
-  }
 }
