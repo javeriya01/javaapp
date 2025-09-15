@@ -27,13 +27,13 @@ spec:
             cpu: "500m"
         livenessProbe:
           httpGet:
-            path: /actuator/health
+            path: /              # ✅ FIXED: Changed from /actuator/health to /
             port: 8080
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /actuator/health
+            path: /              # ✅ FIXED: Changed from /actuator/health to /
             port: 8080
           initialDelaySeconds: 15
           periodSeconds: 5
