@@ -18,6 +18,14 @@ pipeline {
                     else
                         echo "Minikube is already running."
                     fi
+                    
+                    # Fix kubectl context for Jenkins
+                    minikube update-context
+                    
+                    # Fix TLS certificate issue
+                    kubectl config set-cluster minikube --insecure-skip-tls-verify=true
+                    
+                    # Test connection
                     kubectl get nodes
                 '''
             }
