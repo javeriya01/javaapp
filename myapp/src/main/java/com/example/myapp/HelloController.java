@@ -10,7 +10,7 @@ public class HelloController {
     @GetMapping("/")
     public String home() {
         
-            return "Use Cases Completed ";
+            return "Hello from my app j ";
         
     }
 
